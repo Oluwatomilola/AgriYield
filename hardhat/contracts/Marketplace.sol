@@ -128,7 +128,9 @@ contract Marketplace is ReentrancyGuard {
     }
 
     function setAdmin(address newAdmin) external onlyAdmin {
+        // Input validation for address
         require(newAdmin != address(0), "Marketplace: zero admin");
+        require(newAdmin != admin, "Marketplace: same admin");
         admin = newAdmin;
         emit AdminChanged(newAdmin);
     }
@@ -141,11 +143,40 @@ contract Marketplace is ReentrancyGuard {
         uint256 quantity,
         string calldata metadataCID
     ) external returns (uint256) {
-        require(price > 0, "Marketplace: price>0");
-        require(quantity > 0, "Marketplace: qty>0");
+        // Input validation for string lengths
+        require(
+            bytes(metadataCID).length > 0 && bytes(metadataCID).length <= 200,
+            "Marketplace: metadataCID length invalid"
+        );
+
+        // Input validation for numerical ranges
+        require(farmId > 0, "Marketplace: invalid farm ID");
+        require(
+            price > 0 && price <= 1000000 ether,
+            "Marketplace: price out of range"
+        );
+        require(
+            quantity > 0 && quantity <= 100000,
+            "Marketplace: quantity out of range"
+        );
 
         // Verify the caller is the registered farmer for this farm
-        (address farmer, , , , , , , , , bool verified, uint8 status, , , ) = agriYield.getFarm(farmId);
+        (
+            address farmer,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            bool verified,
+            uint8 status,
+            ,
+            ,
+
+        ) = agriYield.getFarm(farmId);
         require(verified, "Marketplace: farm not verified");
         require(msg.sender == farmer, "Marketplace: only farm owner");
 
@@ -176,10 +207,20 @@ contract Marketplace is ReentrancyGuard {
         uint256 price,
         uint256 quantity
     ) external {
+        // Input validation for numerical ranges
+        require(listingId > 0, "Marketplace: invalid listing ID");
+        require(
+            price > 0 && price <= 1000000 ether,
+            "Marketplace: price out of range"
+        );
+        require(
+            quantity > 0 && quantity <= 100000,
+            "Marketplace: quantity out of range"
+        );
+
         Listing storage l = listings[listingId];
         require(l.isActive, "Marketplace: inactive");
         require(msg.sender == l.farmer, "Marketplace: only farmer");
-        require(price > 0 && quantity > 0, "Marketplace: invalid args");
 
         l.price = price;
         l.quantity = quantity;
@@ -201,6 +242,13 @@ contract Marketplace is ReentrancyGuard {
         uint256 listingId,
         uint256 quantity
     ) external nonReentrant returns (uint256) {
+        // Input validation for numerical ranges
+        require(listingId > 0, "Marketplace: invalid listing ID");
+        require(
+            quantity > 0 && quantity <= 100000,
+            "Marketplace: quantity out of range"
+        );
+
         Listing storage l = listings[listingId];
         require(l.isActive, "Marketplace: inactive");
         require(
@@ -228,7 +276,6 @@ contract Marketplace is ReentrancyGuard {
             isDisputed: false,
             disputeReasonCID: "",
             createdAt: block.timestamp
-
         });
 
         userOrders[msg.sender].push(orderId);
@@ -246,6 +293,13 @@ contract Marketplace is ReentrancyGuard {
     }
 
     function shipOrder(uint256 orderId, string calldata shippingCID) external {
+        // Input validation for string lengths
+        require(
+            bytes(shippingCID).length > 0 && bytes(shippingCID).length <= 200,
+            "Marketplace: shippingCID length invalid"
+        );
+        require(orderId > 0, "Marketplace: invalid order ID");
+
         Order storage o = orders[orderId];
         require(msg.sender == o.seller, "Marketplace: only seller");
         require(o.status == OrderStatus.Created, "Marketplace: invalid status");
@@ -260,6 +314,13 @@ contract Marketplace is ReentrancyGuard {
         uint256 orderId,
         string calldata proofCID
     ) external {
+        // Input validation for string lengths
+        require(
+            bytes(proofCID).length > 0 && bytes(proofCID).length <= 200,
+            "Marketplace: proofCID length invalid"
+        );
+        require(orderId > 0, "Marketplace: invalid order ID");
+
         Order storage o = orders[orderId];
         require(msg.sender == o.buyer, "Marketplace: only buyer");
         require(o.status == OrderStatus.Shipped, "Marketplace: invalid status");
@@ -285,11 +346,14 @@ contract Marketplace is ReentrancyGuard {
         emit FundsReleased(orderId, o.seller, o.price);
     }
 
-     /// auto-release to seller if buyer never confirms (seller-protection)
+    /// auto-release to seller if buyer never confirms (seller-protection)
     function autoRelease(uint256 orderId) external nonReentrant {
         Order storage o = orders[orderId];
         require(o.status == OrderStatus.Shipped, "Marketplace: invalid status");
-        require(block.timestamp > o.createdAt + AUTO_RELEASE_PERIOD, "Marketplace: not yet");
+        require(
+            block.timestamp > o.createdAt + AUTO_RELEASE_PERIOD,
+            "Marketplace: not yet"
+        );
         require(!o.isDisputed, "Marketplace: disputed");
 
         o.status = OrderStatus.Completed;
@@ -299,6 +363,13 @@ contract Marketplace is ReentrancyGuard {
     }
 
     function openDispute(uint256 orderId, string calldata reasonCID) external {
+        // Input validation for string lengths
+        require(
+            bytes(reasonCID).length > 0 && bytes(reasonCID).length <= 200,
+            "Marketplace: reasonCID length invalid"
+        );
+        require(orderId > 0, "Marketplace: invalid order ID");
+
         Order storage o = orders[orderId];
         require(msg.sender == o.buyer, "Marketplace: only buyer");
         require(
@@ -313,8 +384,11 @@ contract Marketplace is ReentrancyGuard {
         emit DisputeOpened(orderId, reasonCID);
     }
 
-   /// admin resolves disputes
-    function resolveDispute(uint256 orderId, bool sellerFavor) external onlyAdmin {
+    /// admin resolves disputes
+    function resolveDispute(
+        uint256 orderId,
+        bool sellerFavor
+    ) external onlyAdmin {
         Order storage o = orders[orderId];
         require(o.isDisputed, "Marketplace: not disputed");
         require(
@@ -344,7 +418,9 @@ contract Marketplace is ReentrancyGuard {
     function getOrder(uint256 orderId) external view returns (Order memory) {
         return orders[orderId];
     }
-    function getUserOrders(address user) external view returns (uint256[] memory) {
+    function getUserOrders(
+        address user
+    ) external view returns (uint256[] memory) {
         return userOrders[user];
     }
 }
