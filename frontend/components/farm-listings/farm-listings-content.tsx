@@ -6,7 +6,8 @@ import { FarmCard } from "./farm-card";
 import { FarmFilters } from "./farm-filters";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import SimpleFarmsProvider from "@/lib/farm-data";
+import { useSimpleFarms } from "@/hooks/useSimpleFarms";
+import { formatUnits } from "viem";
 
 export interface Farm {
   id: string;
@@ -30,44 +31,61 @@ export interface Farm {
 }
 
 export function FarmListingsContent() {
-  // ✅ Get farms from the provider (only farms)
-  const { farms: blockchainFarms } = SimpleFarmsProvider();
+  const { farms: blockchainFarms, loading, error } = useSimpleFarms();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCrop, setSelectedCrop] = useState<string>("all");
   const [selectedRegion, setSelectedRegion] = useState<string>("all");
   const [roiRange, setRoiRange] = useState<[number, number]>([0, 50]);
 
-  // ✅ Guard against undefined data
-  const onChainFarms = blockchainFarms ?? [];
+  // Transform blockchain farm data to UI format
+  const farms: Farm[] = (blockchainFarms || []).map((farm: any) => {
+    // Convert BigInt values to numbers
+    const fundingGoal = farm.fundingGoal
+      ? Number(formatUnits(farm.fundingGoal, 18))
+      : 0;
 
-  // ✅ Transform blockchain farm data to UI format
-  const farms: Farm[] = onChainFarms.map((farm: any, index: number) => ({
-    id: farm.data.farmId?.toString() ?? `${index}`,
-    name: farm.data.name ?? "Unnamed Farm",
-    farmer: farm.data.farmer ?? "",
-    cropType: "Various",
-    image: "/golden-wheat-farm.png",
-    duration: "6 months",
-    roi: Number(farm.data.maxROI) || 0,
-    location: "Nigeria",
-    city: "Lagos",
-    state: "Lagos",
-    fundingGoal: Number(farm.data.fundingGoal) || 0,
-    amountRaised: Number(farm.data.totalInvested) || 0,
-    fundingProgress: Math.round(
-      (Number(farm.data.totalInvested || 0) /
-        Number(farm.data.fundingGoal || 1)) *
-        100
-    ),
-    minInvestment: Number(farm.data.sharePrice) || 0,
-    description: farm.data.description ?? "",
-    coordinates: [6.5964, 3.3486],
-    verified: farm.data.verified ?? false,
-    investors: 0,
-  }));
+    const amountRaised = farm.totalInvested
+      ? Number(formatUnits(farm.totalInvested, 18))
+      : 0;
 
-  // 🧮 Filtering logic
+    const minInvestment = farm.sharePrice
+      ? Number(formatUnits(farm.sharePrice, 18))
+      : 0;
+
+    // Calculate funding progress
+    const fundingProgress =
+      fundingGoal > 0 ? Math.round((amountRaised / fundingGoal) * 100) : 0;
+
+    // Extract crop type from description (if available)
+    const cropType = extractCropType(farm.description);
+
+    // Extract location from description (if available)
+    const location = extractLocation(farm.description);
+
+    return {
+      id: farm.id || farm.farmId?.toString(),
+      name: farm.name || "Unnamed Farm",
+      farmer: farm.farmer || "",
+      cropType: cropType || "Various",
+      image: "/golden-wheat-farm.png", // Default image
+      duration: calculateDuration(farm.deadline),
+      roi: Number(farm.maxROI) || 0,
+      location: location.full || "Nigeria",
+      city: location.city || "Lagos",
+      state: location.state || "Lagos",
+      fundingGoal,
+      amountRaised,
+      fundingProgress,
+      minInvestment,
+      description: farm.description || "",
+      coordinates: [6.5964, 3.3486] as [number, number],
+      verified: farm.verified || false,
+      investors: 0, // TODO: Calculate from blockchain data if available
+    };
+  });
+
+  // Filtering logic
   const filteredFarms = farms.filter((farm) => {
     const matchesSearch =
       farm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -87,7 +105,34 @@ export function FarmListingsContent() {
     return matchesSearch && matchesCrop && matchesRegion && matchesRoi;
   });
 
-  // 🧾 Render
+  // Loading state
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-12">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center space-y-4">
+            <div className="loading loading-spinner loading-lg"></div>
+            <p className="text-muted-foreground">Loading farms...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-12">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center space-y-4">
+            <p className="text-red-500">Error loading farms</p>
+            <p className="text-sm text-muted-foreground">{String(error)}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-12">
       <motion.div
@@ -131,7 +176,16 @@ export function FarmListingsContent() {
         />
 
         {/* Results */}
-        {filteredFarms.length > 0 ? (
+        {farms.length === 0 ? (
+          <div className="text-center py-12 space-y-4">
+            <p className="text-muted-foreground text-lg">
+              No farms available yet
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Be the first to create a farm campaign!
+            </p>
+          </div>
+        ) : filteredFarms.length > 0 ? (
           <>
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
@@ -139,8 +193,11 @@ export function FarmListingsContent() {
                 <span className="font-semibold text-foreground">
                   {filteredFarms.length}
                 </span>{" "}
-                farm
-                {filteredFarms.length !== 1 ? "s" : ""}
+                of{" "}
+                <span className="font-semibold text-foreground">
+                  {farms.length}
+                </span>{" "}
+                farm{filteredFarms.length !== 1 ? "s" : ""}
               </p>
             </div>
 
@@ -152,10 +209,71 @@ export function FarmListingsContent() {
           </>
         ) : (
           <div className="text-center py-12 text-muted-foreground">
-            No farms found matching your criteria
+            <p className="text-lg">No farms found matching your criteria</p>
+            <p className="text-sm mt-2">Try adjusting your filters</p>
           </div>
         )}
       </motion.div>
     </div>
   );
+}
+
+// Helper function to extract crop type from description
+function extractCropType(description: string): string {
+  if (!description) return "Various";
+
+  const cropTypes = ["wheat", "corn", "rice", "soybeans", "tomatoes"];
+  const lowerDesc = description.toLowerCase();
+
+  for (const crop of cropTypes) {
+    if (lowerDesc.includes(crop)) {
+      return crop.charAt(0).toUpperCase() + crop.slice(1);
+    }
+  }
+
+  return "Various";
+}
+
+// Helper function to extract location from description
+function extractLocation(description: string): {
+  full: string;
+  city: string;
+  state: string;
+} {
+  if (!description) return { full: "Nigeria", city: "Lagos", state: "Lagos" };
+
+  // Look for "Location: City, State" pattern
+  const locationMatch = description.match(/Location:\s*([^,\n]+),\s*([^\n]+)/i);
+
+  if (locationMatch) {
+    return {
+      full: `${locationMatch[1]}, ${locationMatch[2]}`,
+      city: locationMatch[1].trim(),
+      state: locationMatch[2].trim(),
+    };
+  }
+
+  return { full: "Nigeria", city: "Lagos", state: "Lagos" };
+}
+
+// Helper function to calculate duration from deadline
+function calculateDuration(deadline: bigint | number): string {
+  if (!deadline) return "6 months";
+
+  const deadlineTimestamp =
+    typeof deadline === "bigint" ? Number(deadline) : deadline;
+
+  const now = Math.floor(Date.now() / 1000);
+  const secondsRemaining = deadlineTimestamp - now;
+
+  if (secondsRemaining <= 0) return "Expired";
+
+  const daysRemaining = Math.floor(secondsRemaining / (60 * 60 * 24));
+  const monthsRemaining = Math.floor(daysRemaining / 30);
+
+  if (monthsRemaining > 0) {
+    return `${monthsRemaining} month${monthsRemaining !== 1 ? "s" : ""}`;
+  } else {
+    return `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""}`;
+  }
 }

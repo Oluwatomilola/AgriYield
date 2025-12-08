@@ -3,6 +3,7 @@ import mongoose from "mongoose"
 
 export interface CreateFarmMetadataInput {
   farmer: string
+  farmerId: string
   name: string
   description: string
   location: {
@@ -32,6 +33,7 @@ export class FarmService {
       status: "pending",
       blockchainFarmId: null,
       syncedFromChain: false,
+      farmerId: data.farmerId 
     })
     return farm
   }

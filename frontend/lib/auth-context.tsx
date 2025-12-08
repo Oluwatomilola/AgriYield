@@ -239,10 +239,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const endpoint = isSignUp ? "/auth/signup" : "/auth/signin"
       const fullUrl = `${API_BASE_URL}${endpoint}`
 
-      console.log(" API_BASE_URL:", API_BASE_URL)
-      console.log(" Endpoint:", endpoint)
-      console.log(" Full URL:", fullUrl)
-      console.log(" Request body:", JSON.stringify(requestBody, null, 2))
       console.log(" Is signup:", isSignUp)
 
       const response = await fetch(fullUrl, {
@@ -254,11 +250,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify(requestBody),
       })
 
-      console.log(" Response status:", response.status)
-      console.log(" Response headers:", Object.fromEntries(response.headers.entries()))
+
 
       const data = await response.json()
-      console.log(" Response data:", JSON.stringify(data, null, 2))
 
       if (!response.ok) {
         console.error(" Backend error:", data.message || "Verification failed")

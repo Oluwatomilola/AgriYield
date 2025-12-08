@@ -1,19 +1,31 @@
-"use client"
+"use client";
 
-import { ExternalLink, MapPin } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { ExternalLink, MapPin } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface FarmMapProps {
-  coordinates: [number, number]
-  farmName: string
+  coordinates?: [number, number]; // Make optional
+  farmName: string;
 }
 
 export function FarmMap({ coordinates, farmName }: FarmMapProps) {
-  const [lat, lng] = coordinates
+  // Safe destructuring with fallback
+  const [lat, lng] = coordinates || [0, 0];
+
+  // Don't render map if no valid coordinates
+  if (!coordinates || coordinates.length !== 2) {
+    return (
+      <div className="w-full h-[300px] rounded-lg border bg-muted flex items-center justify-center">
+        <p className="text-muted-foreground">Location data not available</p>
+      </div>
+    );
+  }
 
   // OpenStreetMap embed URL with marker
-  const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.1},${lat - 0.1},${lng + 0.1},${lat + 0.1}&layer=mapnik&marker=${lat},${lng}`
-  const viewOnMapUrl = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=12/${lat}/${lng}`
+  const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${
+    lng - 0.1
+  },${lat - 0.1},${lng + 0.1},${lat + 0.1}&layer=mapnik&marker=${lat},${lng}`;
+  const viewOnMapUrl = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=12/${lat}/${lng}`;
 
   return (
     <div className="space-y-3">
@@ -47,5 +59,5 @@ export function FarmMap({ coordinates, farmName }: FarmMapProps) {
         </Button>
       </div>
     </div>
-  )
+  );
 }

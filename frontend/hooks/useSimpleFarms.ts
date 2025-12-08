@@ -1,130 +1,117 @@
-// hooks/useSimpleFarms.ts
 import { AGRIYIELD_CONTRACT_ABI } from "@/const/abi";
-import { useReadContract } from "wagmi";
+import { useReadContracts } from "wagmi";
 import { useState, useEffect } from "react";
 
 const contractAddress = process.env
   .NEXT_PUBLIC_AGRIYIELD_CONTRACT_ADDRESS as `0x${string}`;
+const MAX_FARMS_TO_CHECK = 20; // Check first 20 possible farm IDs
 
 export const useSimpleFarms = () => {
   const [farms, setFarms] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [errors, setErrors] = useState<any[]>([]);
 
   // Debug contract address
   useEffect(() => {
     console.log("🔍 Contract Address:", contractAddress);
-    console.log("🔍 Address is valid:", contractAddress && contractAddress.startsWith('0x'));
+    console.log(
+      "🔍 Address is valid:",
+      contractAddress && contractAddress.startsWith("0x")
+    );
   }, []);
 
-  // Fetch farms 1, 2, 3 directly
-  const farm1 = useReadContract({
-    address: contractAddress,
-    abi: AGRIYIELD_CONTRACT_ABI,
-    functionName: "getFarm",
-    args: [BigInt(1)],
+  // Generate array of farm IDs to check (1 to 20)
+  const farmIdsToCheck = Array.from(
+    { length: MAX_FARMS_TO_CHECK },
+    (_, i) => i + 1
+  );
+
+  // Fetch all farms at once using multicall
+  const {
+    data: farmsData,
+    isLoading,
+    error,
+    refetch,
+  } = useReadContracts({
+    contracts: farmIdsToCheck.map((id) => ({
+      address: contractAddress,
+      abi: AGRIYIELD_CONTRACT_ABI,
+      functionName: "getFarm" as const,
+      args: [BigInt(id)],
+    })),
   });
 
-  const farm2 = useReadContract({
-    address: contractAddress,
-    abi: AGRIYIELD_CONTRACT_ABI,
-    functionName: "getFarm",
-    args: [BigInt(2)],
-  });
-
-  const farm3 = useReadContract({
-    address: contractAddress,
-    abi: AGRIYIELD_CONTRACT_ABI,
-    functionName: "getFarm",
-    args: [BigInt(3)],
-  });
-
-  // Combine results when all are loaded or errored
+  // Process farm data whenever it changes
   useEffect(() => {
-    const allFarms = [farm1, farm2, farm3];
-    
-    console.log("🚀 Farm fetch status:", {
-      farm1: { isLoading: farm1.isLoading, data: !!farm1.data, error: !!farm1.error, status: farm1.status },
-      farm2: { isLoading: farm2.isLoading, data: !!farm2.data, error: !!farm2.error, status: farm2.status },
-      farm3: { isLoading: farm3.isLoading, data: !!farm3.data, error: !!farm3.error, status: farm3.status }
-    });
+    if (!farmsData) return;
 
-    // Check if any are still loading
-    const isLoading = allFarms.some((farm) => farm.isLoading);
-    
-    // Check if all have finished (either success or error)
-    const allFinished = allFarms.every((farm) => farm.status === 'success' || farm.status === 'error');
+    console.log(
+      "📊 Processing farm data for",
+      farmIdsToCheck.length,
+      "potential farms"
+    );
 
-    if (allFinished || !isLoading) {
-      console.log("📊 Processing farm data:");
-      
-      const processedFarms = allFarms.map((farm, index) => {
-        const farmData = {
-          farmId: index + 1,
-          data: farm.data,
-          error: farm.error,
-          status: farm.status,
-        };
-        
-        console.log(`Farm ${index + 1}:`, {
-          hasData: !!farmData.data,
-          error: farmData.error?.message || farmData.error,
-          status: farmData.status
-        });
-        
-        return farmData;
-      });
+    const processedFarms = farmsData
+      .map((result: any, index: number) => {
+        const farmId = farmIdsToCheck[index];
 
-      // Include farms with valid data (non-zero farmId means farm exists)
-      const validFarms = processedFarms.filter(farm => {
-        if (farm.error) {
-          console.warn(`❌ Farm ${farm.farmId} has error:`, farm.error);
-          return false;
+        // Check if the call succeeded
+        if (result.status !== "success" || !result.result) {
+          console.log(`⚠️ Farm ${farmId}: No data or error`);
+          return null;
         }
-        
-        if (!farm.data) {
-          console.warn(`⚠️ Farm ${farm.farmId} has no data`);
-          return false;
-        }
-        
+
+        const farmData = result.result;
+
         // Check if farm actually exists (farmId should not be 0)
-        const farmExists = farm.data && farm.data.farmId && Number(farm.data.farmId) > 0;
-        console.log(`Farm ${farm.farmId} exists:`, farmExists, farm.data?.farmId);
-        
-        return farmExists;
-      });
+        const farmExists = farmData.farmId && Number(farmData.farmId) > 0;
 
-      console.log("✅ Valid farms found:", validFarms.length, validFarms.map(f => f.farmId));
-      
-      setFarms(validFarms);
-      setErrors(processedFarms.filter(f => f.error).map(f => f.error));
-      setLoading(false);
-    }
-  }, [
-    farm1.isLoading,
-    farm2.isLoading, 
-    farm3.isLoading,
-    farm1.data,
-    farm2.data,
-    farm3.data,
-    farm1.error,
-    farm2.error,
-    farm3.error,
-    farm1.status,
-    farm2.status,
-    farm3.status,
-  ]);
+        if (!farmExists) {
+          console.log(`❌ Farm ${farmId}: Does not exist (farmId is 0)`);
+          return null;
+        }
+
+        console.log(`✅ Farm ${farmId}: Valid farm found`, {
+          name: farmData.name,
+          status: farmData.status,
+          verified: farmData.verified,
+        });
+
+        return {
+          id: farmId.toString(),
+          farmId: Number(farmData.farmId),
+          name: farmData.name,
+          description: farmData.description,
+          farmer: farmData.farmer,
+          fundingGoal: farmData.fundingGoal,
+          sharePrice: farmData.sharePrice,
+          totalInvested: farmData.totalInvested,
+          proceeds: farmData.proceeds,
+          deadline: farmData.deadline,
+          verified: farmData.verified,
+          status: farmData.status,
+          metaCID: farmData.metaCID,
+          minROI: farmData.minROI,
+          maxROI: farmData.maxROI,
+        };
+      })
+      .filter(Boolean); // Remove null entries
+
+    console.log(`✅ Total valid farms found: ${processedFarms.length}`);
+    console.log(
+      "Valid farm IDs:",
+      processedFarms.map((f: any) => f.id)
+    );
+
+    setFarms(processedFarms as any[]);
+  }, [farmsData]);
 
   return {
     farms,
-    loading,
-    errors,
+    loading: isLoading,
+    error,
     contractAddress,
     refetch: () => {
       console.log("🔄 Refetching all farms...");
-      farm1.refetch();
-      farm2.refetch();
-      farm3.refetch();
+      refetch();
     },
   };
 };

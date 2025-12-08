@@ -6,6 +6,7 @@ import { Farm } from "../models/farm.model"
 import { Investment } from "../models/investment.model"
 import { Harvest } from "../models/harvest.model"
 
+
 export class AdminController {
   /**
    * GET /admin/farms

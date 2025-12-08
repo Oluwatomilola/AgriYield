@@ -23,30 +23,62 @@ interface FarmDetailsContentProps {
 }
 
 export function FarmDetailsContent({ farm }: FarmDetailsContentProps) {
-  const { user } = useAuth()
-  const { addToast } = useToast()
-  const router = useRouter()
-  const [investModalOpen, setInvestModalOpen] = useState(false)
+  const { user } = useAuth();
+  const { addToast } = useToast();
+  const router = useRouter();
+  const [investModalOpen, setInvestModalOpen] = useState(false);
 
   const handleInvestClick = () => {
     if (!user) {
-      addToast("Please sign in to invest", "error")
-      router.push("/signin")
-      return
+      addToast("Please sign in to invest", "error");
+      router.push("/signin");
+      return;
     }
 
     if (!user.walletConnected) {
-      addToast("Please connect your wallet to proceed", "error")
-      return
+      addToast("Please connect your wallet to proceed", "error");
+      return;
     }
 
-    setInvestModalOpen(true)
-  }
+    setInvestModalOpen(true);
+  };
+
+  // Safe number formatting utilities
+  const formatCurrency = (value: any): string => {
+    if (value === null || value === undefined) return "0";
+
+    // Convert BigInt to number if needed
+    const numValue = typeof value === "bigint" ? Number(value) : Number(value);
+
+    if (isNaN(numValue)) return "0";
+
+    return numValue.toLocaleString("en-NG", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+  };
+
+  const formatNumber = (value: any): string => {
+    if (value === null || value === undefined) return "0";
+
+    const numValue = typeof value === "bigint" ? Number(value) : Number(value);
+
+    if (isNaN(numValue)) return "0";
+
+    return numValue.toLocaleString("en-NG", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+  };
 
   return (
     <>
       <div className="container mx-auto px-4 py-8">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
           {/* Back Button */}
           <Link
             href="/farm-listings"
@@ -65,7 +97,12 @@ export function FarmDetailsContent({ farm }: FarmDetailsContentProps) {
               transition={{ duration: 0.5, delay: 0.1 }}
               className="relative h-[400px] rounded-2xl overflow-hidden"
             >
-              <Image src={farm.image || "/placeholder.svg"} alt={farm.name} fill className="object-cover" />
+              <Image
+                src={farm.image || "/placeholder.svg"}
+                alt={farm.name}
+                fill
+                className="object-cover"
+              />
               {farm.verified && (
                 <Badge className="absolute top-4 right-4 bg-emerald-500 text-white">
                   <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -84,7 +121,9 @@ export function FarmDetailsContent({ farm }: FarmDetailsContentProps) {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div>
-                      <CardTitle className="text-3xl mb-2">{farm.name}</CardTitle>
+                      <CardTitle className="text-3xl mb-2">
+                        {farm.name}
+                      </CardTitle>
                       <p className="text-muted-foreground">by {farm.farmer}</p>
                     </div>
                     <Badge variant="outline" className="text-base px-3 py-1">
@@ -100,7 +139,9 @@ export function FarmDetailsContent({ farm }: FarmDetailsContentProps) {
                         <TrendingUp className="h-4 w-4" />
                         <span>Expected ROI</span>
                       </div>
-                      <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{farm.roi}%</p>
+                      <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                        {formatNumber(farm.roi)}%
+                      </p>
                     </div>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -121,7 +162,9 @@ export function FarmDetailsContent({ farm }: FarmDetailsContentProps) {
                         <Users className="h-4 w-4" />
                         <span>Investors</span>
                       </div>
-                      <p className="text-lg font-semibold">{farm.investors}</p>
+                      <p className="text-lg font-semibold">
+                        {formatNumber(farm.investors)}
+                      </p>
                     </div>
                   </div>
 
@@ -130,18 +173,29 @@ export function FarmDetailsContent({ farm }: FarmDetailsContentProps) {
                   {/* Funding Progress */}
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Funding Progress</span>
-                      <span className="text-sm font-bold">{farm.fundingProgress}%</span>
+                      <span className="text-sm font-medium">
+                        Funding Progress
+                      </span>
+                      <span className="text-sm font-bold">
+                        {formatNumber(farm.fundingProgress)}%
+                      </span>
                     </div>
-                    <Progress value={farm.fundingProgress} className="h-3" />
+                    <Progress
+                      value={farm.fundingProgress || 0}
+                      className="h-3"
+                    />
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">
-                        <span className="font-semibold text-foreground">₦{farm.amountRaised.toLocaleString()}</span>{" "}
+                        <span className="font-semibold text-foreground">
+                          ₦{formatCurrency(farm.amountRaised)}
+                        </span>{" "}
                         raised
                       </span>
                       <span className="text-muted-foreground">
                         Goal:{" "}
-                        <span className="font-semibold text-foreground">₦{farm.fundingGoal.toLocaleString()}</span>
+                        <span className="font-semibold text-foreground">
+                          ₦{formatCurrency(farm.fundingGoal)}
+                        </span>
                       </span>
                     </div>
                   </div>
@@ -151,8 +205,12 @@ export function FarmDetailsContent({ farm }: FarmDetailsContentProps) {
                   {/* Investment Info */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Minimum Investment</span>
-                      <span className="font-semibold">₦{farm.minInvestment.toLocaleString()}</span>
+                      <span className="text-muted-foreground">
+                        Minimum Investment
+                      </span>
+                      <span className="font-semibold">
+                        ₦{formatCurrency(farm.minInvestment)}
+                      </span>
                     </div>
                   </div>
 
@@ -198,7 +256,9 @@ export function FarmDetailsContent({ farm }: FarmDetailsContentProps) {
                     <CardTitle>Overview</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground leading-relaxed">{farm.description}</p>
+                    <p className="text-muted-foreground leading-relaxed">
+                      {farm.description}
+                    </p>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -220,21 +280,27 @@ export function FarmDetailsContent({ farm }: FarmDetailsContentProps) {
                           <DollarSign className="h-4 w-4" />
                           <span>Funding Goal</span>
                         </div>
-                        <p className="text-2xl font-bold">₦{farm.fundingGoal.toLocaleString()}</p>
+                        <p className="text-2xl font-bold">
+                          ₦{formatCurrency(farm.fundingGoal)}
+                        </p>
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <DollarSign className="h-4 w-4" />
                           <span>Amount Raised</span>
                         </div>
-                        <p className="text-2xl font-bold">₦{farm.amountRaised.toLocaleString()}</p>
+                        <p className="text-2xl font-bold">
+                          ₦{formatCurrency(farm.amountRaised)}
+                        </p>
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <TrendingUp className="h-4 w-4" />
                           <span>Expected ROI</span>
                         </div>
-                        <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{farm.roi}%</p>
+                        <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                          {formatNumber(farm.roi)}%
+                        </p>
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -248,14 +314,18 @@ export function FarmDetailsContent({ farm }: FarmDetailsContentProps) {
                           <DollarSign className="h-4 w-4" />
                           <span>Minimum Investment</span>
                         </div>
-                        <p className="text-2xl font-bold">₦{farm.minInvestment.toLocaleString()}</p>
+                        <p className="text-2xl font-bold">
+                          ₦{formatCurrency(farm.minInvestment)}
+                        </p>
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Users className="h-4 w-4" />
                           <span>Total Investors</span>
                         </div>
-                        <p className="text-2xl font-bold">{farm.investors}</p>
+                        <p className="text-2xl font-bold">
+                          {formatNumber(farm.investors)}
+                        </p>
                       </div>
                     </div>
                   </CardContent>
@@ -291,9 +361,12 @@ export function FarmDetailsContent({ farm }: FarmDetailsContentProps) {
                   <CardTitle>Location</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <FarmMap coordinates={farm.coordinates} farmName={farm.name} />
+                  <FarmMap
+                    coordinates={farm.coordinates}
+                    farmName={farm.name}
+                  />
                   <div className="mt-4 flex items-start gap-2 text-sm text-muted-foreground">
-                    <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
                     <span>{farm.location}</span>
                   </div>
                 </CardContent>
@@ -311,5 +384,5 @@ export function FarmDetailsContent({ farm }: FarmDetailsContentProps) {
         roi={farm.roi}
       />
     </>
-  )
+  );
 }

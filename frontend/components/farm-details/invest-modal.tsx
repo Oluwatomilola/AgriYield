@@ -1,69 +1,104 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { X, Wallet, TrendingUp, DollarSign, Coins } from "lucide-react"
-import { useToast } from "@/components/ui/toast"
-import { useAuth } from "@/lib/auth-context"
-import { useRouter } from "next/navigation"
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { X, Wallet, TrendingUp, DollarSign, Coins } from "lucide-react";
+import { useToast } from "@/components/ui/toast";
+import { useAuth } from "@/lib/auth-context";
+import { useRouter } from "next/navigation";
 
 interface InvestModalProps {
-  isOpen: boolean
-  onClose: () => void
-  farmName: string
-  minInvestment: number
-  roi: number
+  isOpen: boolean;
+  onClose: () => void;
+  farmName: string;
+  minInvestment: number | bigint | string; // Accept multiple types
+  roi: number;
 }
 
-const AGT_PRICE = 100 // 1 AGT = ₦100
+const AGT_PRICE = 100; // 1 AGT = ₦100
 
-export function InvestModal({ isOpen, onClose, farmName, minInvestment, roi }: InvestModalProps) {
-  const [amount, setAmount] = useState(minInvestment.toString())
-  const [isLoading, setIsLoading] = useState(false)
-  const { user } = useAuth()
-  const { addToast } = useToast()
-  const router = useRouter()
+export function InvestModal({
+  isOpen,
+  onClose,
+  farmName,
+  minInvestment,
+  roi,
+}: InvestModalProps) {
+  // Convert minInvestment to number safely
+  const minInvestmentNum =
+    typeof minInvestment === "bigint"
+      ? Number(minInvestment)
+      : typeof minInvestment === "string"
+      ? Number(minInvestment)
+      : minInvestment;
 
-  const numericAmount = Number.parseFloat(amount) || 0
-  const agtTokens = numericAmount / AGT_PRICE
-  const expectedReturn = numericAmount * (1 + roi / 100)
+const [amount, setAmount] = useState(
+  minInvestmentNum !== undefined && minInvestmentNum !== null
+    ? minInvestmentNum.toString()
+    : "0"
+  );
+  const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth();
+  const { addToast } = useToast();
+  const router = useRouter();
+
+  const numericAmount = Number.parseFloat(amount) || 0;
+  const agtTokens = numericAmount / AGT_PRICE;
+  const expectedReturn = numericAmount * (1 + roi / 100);
 
   const handleInvest = async () => {
     // Check authentication
     if (!user) {
-      addToast("Please sign in to invest", "error")
-      router.push("/signin")
-      return
+      addToast("Please sign in to invest", "error");
+      router.push("/signin");
+      return;
     }
 
     // Check wallet connection
     if (!user.walletConnected) {
-      addToast("Please connect your wallet to proceed", "error")
-      return
+      addToast("Please connect your wallet to proceed", "error");
+      return;
     }
 
     // Validate amount
-    if (numericAmount < minInvestment) {
-      addToast(`Minimum investment is ₦${minInvestment.toLocaleString()}`, "error")
-      return
+    if (numericAmount < minInvestmentNum) {
+      addToast(
+        `Minimum investment is ₦${minInvestmentNum.toLocaleString()}`,
+        "error"
+      );
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      // Mock investment transaction
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      addToast(`Successfully invested ₦${numericAmount.toLocaleString()} in ${farmName}!`, "success")
-      onClose()
+      // TODO: Integrate with useInvest hook
+      // const result = await invest(farmId, amount);
+
+      // Mock investment transaction for now
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      addToast(
+        `Successfully invested ₦${numericAmount.toLocaleString()} in ${farmName}!`,
+        "success"
+      );
+      onClose();
     } catch (error) {
-      addToast("Investment failed. Please try again.", "error")
+      console.error("Investment error:", error);
+      addToast("Investment failed. Please try again.", "error");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <AnimatePresence>
@@ -99,7 +134,9 @@ export function InvestModal({ isOpen, onClose, farmName, minInvestment, roi }: I
                   >
                     <Wallet className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
                   </motion.div>
-                  <CardTitle className="text-2xl font-bold text-center">Invest in {farmName}</CardTitle>
+                  <CardTitle className="text-2xl font-bold text-center">
+                    Invest in {farmName}
+                  </CardTitle>
                   <CardDescription className="text-center">
                     Enter the amount you want to invest and receive AGT tokens
                   </CardDescription>
@@ -113,16 +150,16 @@ export function InvestModal({ isOpen, onClose, farmName, minInvestment, roi }: I
                       <Input
                         id="amount"
                         type="number"
-                        placeholder={minInvestment.toString()}
+                        placeholder={minInvestmentNum.toString()}
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
-                        min={minInvestment}
+                        min={minInvestmentNum}
                         step={1000}
                         className="pl-10 text-lg"
                       />
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Minimum investment: ₦{minInvestment.toLocaleString()}
+                      Minimum investment: ₦{minInvestmentNum.toLocaleString()}
                     </p>
                   </div>
 
@@ -142,10 +179,14 @@ export function InvestModal({ isOpen, onClose, farmName, minInvestment, roi }: I
                         <TrendingUp className="h-4 w-4" />
                         <span>Expected Return ({roi}%)</span>
                       </div>
-                      <p className="text-lg font-bold">₦{expectedReturn.toLocaleString()}</p>
+                      <p className="text-lg font-bold">
+                        ₦{expectedReturn.toLocaleString()}
+                      </p>
                     </div>
                     <div className="flex items-center justify-between pt-2 border-t border-emerald-200 dark:border-emerald-800">
-                      <span className="text-sm font-medium">Potential Profit</span>
+                      <span className="text-sm font-medium">
+                        Potential Profit
+                      </span>
                       <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
                         ₦{(expectedReturn - numericAmount).toLocaleString()}
                       </p>
@@ -156,8 +197,13 @@ export function InvestModal({ isOpen, onClose, farmName, minInvestment, roi }: I
                   {user?.walletConnected && (
                     <div className="p-3 rounded-lg bg-muted/50 border">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Connected Wallet</span>
-                        <span className="font-mono font-medium">{user.walletAddress}</span>
+                        <span className="text-muted-foreground">
+                          Connected Wallet
+                        </span>
+                        <span className="font-mono font-medium text-xs">
+                          {user.walletAddress?.slice(0, 6)}...
+                          {user.walletAddress?.slice(-4)}
+                        </span>
                       </div>
                     </div>
                   )}
@@ -168,18 +214,31 @@ export function InvestModal({ isOpen, onClose, farmName, minInvestment, roi }: I
                       onClick={handleInvest}
                       className="w-full gradient-primary text-white"
                       size="lg"
-                      disabled={isLoading || numericAmount < minInvestment}
+                      disabled={isLoading || numericAmount < minInvestmentNum}
                     >
-                      {isLoading ? "Processing..." : `Invest ₦${numericAmount.toLocaleString()}`}
+                      {isLoading ? (
+                        <>
+                          <span className="loading loading-spinner loading-sm mr-2"></span>
+                          Processing...
+                        </>
+                      ) : (
+                        `Invest ₦${numericAmount.toLocaleString()}`
+                      )}
                     </Button>
-                    <Button onClick={onClose} variant="outline" className="w-full bg-transparent" disabled={isLoading}>
+                    <Button
+                      onClick={onClose}
+                      variant="outline"
+                      className="w-full bg-transparent"
+                      disabled={isLoading}
+                    >
                       Cancel
                     </Button>
                   </div>
 
                   {/* Disclaimer */}
                   <p className="text-xs text-center text-muted-foreground">
-                    By investing, you agree to the terms and conditions. Investments are subject to market risks.
+                    By investing, you agree to the terms and conditions.
+                    Investments are subject to market risks.
                   </p>
                 </CardContent>
               </Card>
@@ -188,5 +247,5 @@ export function InvestModal({ isOpen, onClose, farmName, minInvestment, roi }: I
         </>
       )}
     </AnimatePresence>
-  )
+  );
 }

@@ -3,13 +3,13 @@ import cors from "cors"
 import helmet from "helmet"
 import { initializeMagic } from "./config/magic"
 import farmRoutes from "./routes/farm.routes"
-import investmentRoutes from "./routes/investment.routes"
+// import investmentRoutes from "./routes/investment.routes"
 import authRoutes from "./routes/auth.routes"
 import adminRoutes from "./routes/admin.routes"
 import { setupSwagger } from "./config/swagger"
 import { errorHandler } from "./middleware/errorHandler.middleware"
 import { initializeBlockchainService } from "./services/blockchain.services"
-import { testBlockchainConnection } from "./config/blockchain.config"
+// import { testBlockchainConnection } from "./config/blockchain.config"
 import { initializeEventSync } from "./services/event-sync.service"
 
 initializeMagic()
@@ -19,7 +19,7 @@ const app = express();
 (async () => {
   initializeBlockchainService()
   initializeEventSync()
-  await testBlockchainConnection()
+  // await testBlockchainConnection()
 })()
 app.set("trust proxy", 1)
 app.use(
