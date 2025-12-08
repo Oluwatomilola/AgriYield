@@ -3,16 +3,25 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /// @title FarmShares
 /// @notice ERC1155 contract where each farm has its own tokenId representing shares.
 /// @dev Ownership is initially with deployer, then transferred to AgriYield after setup.
-contract FarmShares is ERC1155, Ownable {
+contract FarmShares is ERC1155, Ownable, ReentrancyGuard {
     event FarmSharesDeployed(address owner);
     event AgriYieldSet(address indexed newAgriYield);
     event FarmRegistered(uint256 indexed farmId, uint256 maxSupply, string uri);
-    event SharesMinted(address indexed to, uint256 indexed farmId, uint256 amount);
-    event SharesBurned(uint256 indexed farmId, address indexed investor, uint256 amount);
+    event SharesMinted(
+        address indexed to,
+        uint256 indexed farmId,
+        uint256 amount
+    );
+    event SharesBurned(
+        uint256 indexed farmId,
+        address indexed investor,
+        uint256 amount
+    );
 
     struct FarmInfo {
         uint256 maxSupply;
@@ -45,8 +54,11 @@ contract FarmShares is ERC1155, Ownable {
         uint256 farmId,
         uint256 maxSupply,
         string memory _uri
-    ) external onlyAgriYield {
-        require(farms[farmId].maxSupply == 0, "FarmShares: Farm already exists");
+    ) external onlyAgriYield nonReentrant {
+        require(
+            farms[farmId].maxSupply == 0,
+            "FarmShares: Farm already exists"
+        );
         farms[farmId] = FarmInfo(maxSupply, 0, _uri);
         emit FarmRegistered(farmId, maxSupply, _uri);
     }
@@ -56,7 +68,7 @@ contract FarmShares is ERC1155, Ownable {
         address to,
         uint256 farmId,
         uint256 amount
-    ) external onlyAgriYield {
+    ) external onlyAgriYield nonReentrant {
         FarmInfo storage farm = farms[farmId];
         require(
             farm.totalMinted + amount <= farm.maxSupply,
@@ -77,7 +89,7 @@ contract FarmShares is ERC1155, Ownable {
         address from,
         uint256 farmId,
         uint256 amount
-    ) external onlyAgriYield {
+    ) external onlyAgriYield nonReentrant {
         _burn(from, farmId, amount);
         emit SharesBurned(farmId, from, amount);
     }
