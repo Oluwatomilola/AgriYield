@@ -4,9 +4,10 @@ pragma solidity ^0.8.20;
 import "./FarmShares.sol";
 import "./MockUSDT.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
 
-contract AgriYield is ReentrancyGuard {
+contract AgriYield is ReentrancyGuard, Pausable {
     enum Status {
         Active,
         Funded,
@@ -48,6 +49,8 @@ contract AgriYield is ReentrancyGuard {
     event FarmClosed(uint256 indexed farmId);   
     event InvestorRefunded(uint256 indexed farmId, address indexed investor, uint256 amount);
     event ProceedsDeposited(uint256 indexed farmId, uint256 amount, uint256 roiPercent);
+    event Paused(address account);
+    event Unpaused(address account);
 
     modifier onlyAdmin() {
             require(msg.sender == admin, "AgriYield: only admin");
@@ -75,7 +78,7 @@ contract AgriYield is ReentrancyGuard {
         uint256 deadline,
         uint256 minROI,
         uint256 maxROI
-    ) external {
+    ) external whenNotPaused {
         require(fundingGoal > 0 && maxSupply > 0 && sharePrice > 0, "AgriYield: invalid args");
         require(fundingGoal == sharePrice * maxSupply, "AgriYield: inconsistent params");
         require(deadline > block.timestamp, "AgriYield: invalid deadline");
@@ -94,7 +97,7 @@ contract AgriYield is ReentrancyGuard {
         emit FarmVerified(farmId);
     }
 
-    function invest(uint256 farmId, uint256 amount) external nonReentrant {
+    function invest(uint256 farmId, uint256 amount) external nonReentrant whenNotPaused {
         Farm storage farm = farms[farmId];
         require(farm.verified, "Farm not verified");
         require(farm.status == Status.Active, "Farm not active");
@@ -136,7 +139,7 @@ contract AgriYield is ReentrancyGuard {
             emit FundDisbursed(farmId, amount);
     }
     
-    function depositProceeds(uint256 farmId, uint256 amount) external nonReentrant {
+    function depositProceeds(uint256 farmId, uint256 amount) external nonReentrant whenNotPaused {
         Farm storage f = farms[farmId];
         require(msg.sender == f.farmer, "Not farmer");
         require(f.status == Status.PaidOut, "Farm not paid out yet");
@@ -156,7 +159,7 @@ contract AgriYield is ReentrancyGuard {
     }
 
     /// @notice Investors claim proportional payout after settlement
-    function claimInvestorPayout(uint256 farmId) external nonReentrant {
+    function claimInvestorPayout(uint256 farmId) external nonReentrant whenNotPaused {
         Farm storage f = farms[farmId];
         require(f.status == Status.Settled, "AgriYield: Not settled");
 
@@ -229,6 +232,16 @@ contract AgriYield is ReentrancyGuard {
         Farm storage f = farms[farmId];
         minExpected = f.fundingGoal + ((f.fundingGoal * f.minROI) / 100);
         maxExpected = f.fundingGoal + ((f.fundingGoal * f.maxROI) / 100);
+    }
+
+    /// @notice Emergency pause function - only admin can call
+    function pause() external onlyAdmin {
+        _pause();
+    }
+
+    /// @notice Emergency unpause function - only admin can call
+    function unpause() external onlyAdmin {
+        _unpause();
     }
 
 }

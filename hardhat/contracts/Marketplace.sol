@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
 interface IAgriYield {
     function getFarm(
@@ -29,7 +30,7 @@ interface IAgriYield {
         );
 }
 
-contract Marketplace is ReentrancyGuard {
+contract Marketplace is ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
     IERC20 public AGT; // same AGT token used in AgriYield
@@ -111,6 +112,8 @@ contract Marketplace is ReentrancyGuard {
     event DisputeOpened(uint256 indexed orderId, string reasonCID);
     event DisputeResolved(uint256 indexed orderId, bool sellerFavor);
     event AdminChanged(address indexed newAdmin);
+    event Paused(address account);
+    event Unpaused(address account);
 
     constructor(address _stableToken, address _agriYield, address _admin) {
         require(_stableToken != address(0), "Marketplace: zero token");
@@ -140,7 +143,7 @@ contract Marketplace is ReentrancyGuard {
         uint256 price,
         uint256 quantity,
         string calldata metadataCID
-    ) external returns (uint256) {
+    ) external whenNotPaused returns (uint256) {
         require(price > 0, "Marketplace: price>0");
         require(quantity > 0, "Marketplace: qty>0");
 
@@ -200,7 +203,7 @@ contract Marketplace is ReentrancyGuard {
     function purchase(
         uint256 listingId,
         uint256 quantity
-    ) external nonReentrant returns (uint256) {
+    ) external nonReentrant whenNotPaused returns (uint256) {
         Listing storage l = listings[listingId];
         require(l.isActive, "Marketplace: inactive");
         require(
@@ -346,5 +349,15 @@ contract Marketplace is ReentrancyGuard {
     }
     function getUserOrders(address user) external view returns (uint256[] memory) {
         return userOrders[user];
+    }
+
+    /// @notice Emergency pause function - only admin can call
+    function pause() external onlyAdmin {
+        _pause();
+    }
+
+    /// @notice Emergency unpause function - only admin can call
+    function unpause() external onlyAdmin {
+        _unpause();
     }
 }
