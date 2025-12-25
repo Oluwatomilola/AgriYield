@@ -1,5 +1,6 @@
 import { Farm, type IFarm } from "../models/farm.model"
 import mongoose from "mongoose"
+import { Investment } from "../models/investment.model"
 
 export interface CreateFarmMetadataInput {
   farmer: string
@@ -34,6 +35,54 @@ export class FarmService {
       syncedFromChain: false,
     })
     return farm
+  }
+
+  /**
+   * Recalculate and persist investment-related aggregates for a farm
+   */
+  static async updateInvestmentStats(farmId: string): Promise<IFarm | null> {
+    if (!mongoose.Types.ObjectId.isValid(farmId)) return null
+
+    const objectId = new mongoose.Types.ObjectId(farmId)
+
+    const stats = await Investment.aggregate([
+      { $match: { farmId: objectId } },
+      {
+        $group: {
+          _id: "$farmId",
+          totalInvestment: { $sum: "$amount" },
+          totalActiveInvestment: {
+            $sum: { $cond: [{ $eq: ["$status", "active"] }, "$amount", 0] }
+          },
+          totalCompletedInvestment: {
+            $sum: { $cond: [{ $eq: ["$status", "completed"] }, "$amount", 0] }
+          },
+          totalROI: { $sum: "$roiEarned" },
+          totalPayouts: { $sum: "$totalPayouts" },
+          investorSet: { $addToSet: "$investorId" }
+        }
+      }
+    ])
+
+    const s = stats[0]
+
+    const updates: Partial<IFarm> = {}
+    if (s) {
+      updates.amountRaised = s.totalInvestment || 0
+      updates.investorCount = Array.isArray(s.investorSet) ? s.investorSet.length : 0
+      // store numeric totalProceeds and string-totalInvested for backward compatibility
+      updates.totalProceeds = s.totalROI || 0
+      updates.totalInvested = (s.totalInvestment || 0).toString()
+    } else {
+      updates.amountRaised = 0
+      updates.investorCount = 0
+      updates.totalProceeds = 0
+      updates.totalInvested = "0"
+    }
+
+    updates.lastSyncedAt = new Date()
+
+    return await Farm.findByIdAndUpdate(farmId, updates, { new: true })
   }
 
   /** Link farm metadata with blockchain farmId (called after FarmCreated event) */
