@@ -181,9 +181,12 @@ contract Marketplace is ReentrancyGuard {
         require(msg.sender == l.farmer, "Marketplace: only farmer");
         require(price > 0 && quantity > 0, "Marketplace: invalid args");
 
+        uint256 sold = l.quantity - l.quantityRemaining;
+        require(quantity >= sold, "Cannot reduce quantity below sold amount");
+
         l.price = price;
         l.quantity = quantity;
-        l.quantityRemaining = quantity;
+        l.quantityRemaining = quantity - sold;
         emit ListingUpdated(listingId, price, quantity);
     }
 
